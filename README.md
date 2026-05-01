@@ -1,4 +1,4 @@
-# BlackSpace — 個人財務管理 Web App
+# BlackSpace — 個人財務管理
 
 一個平台追蹤收支、管理投資組合、設定預算目標。
 
