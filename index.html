@@ -868,6 +868,9 @@ table{border-collapse:collapse;width:100%}
   const app  = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db   = getFirestore(app);
+  // Export for BlackInvest module
+  window._bsAuth = auth;
+  window._bsDb = db;
   // Session-only persistence: user must log in again every time they open the app
   // Persistent login: 7-day session (keep user signed in across browser closes)
   const SESSION_KEY = 'bs_session_started_at';
@@ -1116,6 +1119,12 @@ table{border-collapse:collapse;width:100%}
       await window._fbLoadUserData();
       window._appData.onUserReady();
       hideLoading();
+      // Notify BSI module that auth is ready
+      window._bsiAuthReady = true;
+      if(typeof window.bsiBootstrap === 'function' && window._bsiPendingBoot){
+        window._bsiPendingBoot = false;
+        window.bsiBootstrap();
+      }
     } else {
       window._appData.clearUserMemory();
       // Show landing page instead of auth directly on logout
@@ -1130,6 +1139,100 @@ table{border-collapse:collapse;width:100%}
   });
 
   </script>
+
+<!-- ══════════ BLACKINVEST MODULE CSS ══════════ -->
+<style>
+/* BSI screens */
+#bsi-screen-home, #bsi-screen-detail, #bsi-screen-discover,
+#bsi-screen-orders { display: none; }
+#bsi-screen-home.active, #bsi-screen-detail.active, #bsi-screen-discover.active,
+#bsi-screen-orders.active { display: block; animation: fadeUp .2s ease both; }
+
+/* BSI sub-nav active state */
+.bsi-subnav-btn.active {
+  background: var(--surface) !important;
+  color: var(--primary) !important;
+  box-shadow: var(--shadow);
+}
+
+/* BSI tab buttons (chart timeframe) */
+.bsi-tab {
+  padding: 4px 10px; border: none; border-radius: var(--r);
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  font-family: inherit; background: transparent; color: var(--muted);
+  transition: all .15s;
+}
+.bsi-tab.active { background: var(--primary); color: #fff; }
+
+/* BSI filter buttons */
+.bsi-filter-btn {
+  padding: 4px 10px; border: 1px solid var(--divider); border-radius: var(--rFull);
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  font-family: inherit; background: var(--surface); color: var(--muted);
+  transition: all .15s;
+}
+.bsi-filter-btn.active { background: var(--primaryHL); border-color: var(--primary); color: var(--primary); }
+
+/* BSI watchlist item */
+.bsi-wl-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid var(--divider); cursor: pointer;
+  transition: opacity .15s;
+}
+.bsi-wl-item:last-child { border-bottom: none; }
+.bsi-wl-item:hover { opacity: .75; }
+
+/* BSI order row */
+.bsi-order-row {
+  display: grid; grid-template-columns: 32px 1fr auto;
+  align-items: center; gap: 10px; padding: 10px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.bsi-order-row:last-child { border-bottom: none; }
+
+/* BSI discover card */
+.bsi-disc-card {
+  background: var(--surfaceOff); border-radius: var(--rLg);
+  padding: 14px; cursor: pointer; transition: background .15s;
+}
+.bsi-disc-card:hover { background: var(--surfaceDyn); }
+
+/* BSI stat line */
+.bsi-stat-line {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 0; border-bottom: 1px solid var(--divider); font-size: 12px;
+}
+.bsi-stat-line:last-child { border-bottom: none; }
+
+/* BSI summary row */
+.bsi-sum-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 13px;
+}
+
+/* BSI holding table row */
+.bsi-holding-tr { border-bottom: 1px solid var(--divider); cursor: pointer; transition: background .15s; }
+.bsi-holding-tr:hover { background: var(--surfaceOff); }
+.bsi-holding-tr td { padding: 10px 0; font-size: 13px; }
+
+/* BSI legend */
+.bsi-legend-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+
+/* BSI modal */
+.bsi-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); backdrop-filter: blur(4px); z-index: 200; display: none; align-items: center; justify-content: center; }
+.bsi-modal-overlay.open { display: flex; }
+.bsi-modal-card { background: var(--surface); border-radius: var(--rXl); box-shadow: var(--shadowXl); width: min(400px, calc(100% - 32px)); padding: 24px; animation: fadeUp .2s ease; }
+
+/* Mobile responsive */
+@media (max-width: 767px) {
+  #view-blackinvest .dash-grid { grid-template-columns: 1fr !important; }
+  #view-blackinvest .kpi-grid { grid-template-columns: repeat(2,1fr) !important; }
+  #view-blackinvest .kpi-grid .kpi-card[style*="span 2"] { grid-column: span 2; }
+  #bsi-subnav button span { display: none; }
+  #bsi-discoverGrid { grid-template-columns: repeat(2,1fr) !important; }
+}
+</style>
+
 </head>
 <body data-cc-id="cc-1" style="font-size: 14px; background-color: rgb(255, 255, 255);">
 
@@ -1139,7 +1242,7 @@ table{border-collapse:collapse;width:100%}
   <!-- Nav -->
   <nav class="lp-nav">
     <div class="lp-logo" style="cursor:pointer" onclick="document.getElementById('landing-page').scrollTo({top:0,behavior:'smooth'})">
-      <img src="BlackLab.png" height="38" alt="BlackLab">
+      <img src="BlackLab.png" height="30" alt="BlackLab">
       BlackLab
     </div>
     <div class="lp-nav-links">
@@ -1219,7 +1322,7 @@ table{border-collapse:collapse;width:100%}
     <div class="lp-section">
       <div class="lp-section-tag">✦ 功能特色</div>
       <h2 class="lp-section-title">你需要的，<br>全部都在這裡</h2>
-      <p class="lp-section-sub">每個功能都是為了讓你更清楚了解自己的財務狀況而設計</p>
+      <p class="lp-section-sub">每個功能都是為了讓你更清楚了解自己的財務狀況而設計，包括全新模擬股票交易體驗。</p>
       <div class="lp-features-grid">
         <div class="lp-feat">
           <div class="lp-feat-icon" style="background:rgba(10,132,255,.15)">📊</div>
@@ -1250,6 +1353,11 @@ table{border-collapse:collapse;width:100%}
           <div class="lp-feat-icon" style="background:rgba(10,132,255,.1)">💱</div>
           <div class="lp-feat-title">多幣別支援</div>
           <div class="lp-feat-desc">投資組合支援 USD、HKD、EUR、GBP、JPY，自動換算成 HKD 顯示。</div>
+        </div>
+        <div class="lp-feat" style="border:1.5px solid rgba(48,209,88,.25);background:rgba(48,209,88,.04);">
+          <div class="lp-feat-icon" style="background:rgba(48,209,88,.15)">📊</div>
+          <div class="lp-feat-title">模擬股票交易 <span style="font-size:10px;font-weight:700;background:rgba(48,209,88,.15);color:#1a7f3c;padding:2px 7px;border-radius:999px;vertical-align:middle;margin-left:4px;">NEW</span></div>
+          <div class="lp-feat-desc">零風險體驗真實股市。自訂模擬資金，即時報價、市價/限價下單、K線圖分析，Top 10 大市值股票一覽，練習無需再等。</div>
         </div>
       </div>
     </div>
@@ -1539,6 +1647,10 @@ table{border-collapse:collapse;width:100%}
       <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
       <span class="nav-btn-label">Budget Goals</span>
     </button>
+    <button class="nav-btn" data-view="blackinvest" data-tip="模擬交易">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="3" x2="6" y2="6"/><rect x="4" y="6" width="4" height="6" rx="0.5"/><line x1="6" y1="12" x2="6" y2="15"/><line x1="12" y1="5" x2="12" y2="8"/><rect x="10" y="8" width="4" height="7" rx="0.5"/><line x1="12" y1="15" x2="12" y2="18"/><line x1="18" y1="2" x2="18" y2="5"/><rect x="16" y="5" width="4" height="5" rx="0.5"/><line x1="18" y1="10" x2="18" y2="13"/></svg>
+      <span class="nav-btn-label">模擬交易</span>
+    </button>
   </nav>
   <div class="sidebar-user">
     <button class="sidebar-user-btn" id="profile-edit-btn" title="Edit profile">
@@ -1711,10 +1823,7 @@ table{border-collapse:collapse;width:100%}
                 <button class="chart-range-btn active" data-range="annual" data-i18n="card-cat-annual">年度分類佔比</button>
                 <button class="chart-range-btn" data-range="monthly" data-i18n="card-cat-monthly">月度分類佔比</button>
               </div>
-              <div class="chart-toggle" id="dash-chart-toggle">
-                <button class="chart-toggle-btn active" data-chart="donut">餅圖</button>
-                <button class="chart-toggle-btn" data-chart="bar">長條</button>
-              </div>
+              <button id="dash-chart-cycle" onclick="dashCycleChart()" style="padding:4px 12px;border:1px solid var(--divider);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--muted);font-family:inherit;letter-spacing:.05em;">◁ ▷</button>
             </div>
             <div id="dash-donut-wrap"></div>
             <div id="dash-bar-wrap" style="display:none"></div>
@@ -1856,6 +1965,235 @@ table{border-collapse:collapse;width:100%}
         </div>
       </div>
     </div>
+
+<!-- ══════════════════════════════════════
+     BLACKINVEST VIEW
+══════════════════════════════════════ -->
+    <div class="view" id="view-blackinvest">
+
+      <!-- BSI Sub-tabs (matches BlackSpace topbar style) -->
+      <div id="bsi-subnav" style="display:flex;gap:4px;margin-bottom:20px;background:var(--surfaceOff);border-radius:var(--rLg);padding:4px;">
+        <button class="bsi-subnav-btn active" data-bsi="home" style="flex:1;padding:7px 4px;border:none;border-radius:calc(var(--rLg) - 2px);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;background:var(--surface);color:var(--text);box-shadow:var(--shadow);">⌂ 組合</button>
+        <button class="bsi-subnav-btn" data-bsi="discover" style="flex:1;padding:7px 4px;border:none;border-radius:calc(var(--rLg) - 2px);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;background:transparent;color:var(--muted);">✦ Top 10</button>
+        <button class="bsi-subnav-btn" data-bsi="detail" style="flex:1;padding:7px 4px;border:none;border-radius:calc(var(--rLg) - 2px);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;background:transparent;color:var(--muted);">⌕ 市場</button>
+        <button class="bsi-subnav-btn" data-bsi="orders" style="flex:1;padding:7px 4px;border:none;border-radius:calc(var(--rLg) - 2px);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;background:transparent;color:var(--muted);">⇄ 交易</button>
+      </div>
+
+      <!-- HOME (合拼組合 + 持倉) -->
+      <div id="bsi-screen-home" class="active">
+
+        <!-- KPIs：總資產、購買力、持股市值、總回報 -->
+        <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);">
+          <div class="kpi-card" style="grid-column:span 2;">
+            <div class="kpi-lbl">總資產</div>
+            <div class="kpi-val" id="bsi-homeTotalValue">—</div>
+            <div id="bsi-homeDelta" style="font-size:12px;font-weight:600;margin-top:4px;">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-lbl">購買力</div>
+            <div class="kpi-val" id="bsi-homeBuyingPower">—</div>
+            <div class="kpi-sub">現金餘額</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-lbl">持股市值</div>
+            <div class="kpi-val" id="bsi-homePortValue">—</div>
+            <div class="kpi-sub" id="bsi-holdingsCount">0 支股票</div>
+          </div>
+        </div>
+
+        <!-- 走勢圖 + 觀察名單 -->
+        <div class="dash-grid" style="grid-template-columns:1fr 280px;margin-bottom:12px;align-items:stretch;">
+          <div class="card">
+            <div class="card-hdr">
+              <span class="card-title">資產走勢</span>
+              <div style="display:flex;gap:4px;" id="bsi-homeTimeTabs">
+                <button class="bsi-tab active" data-range="1d">1D</button>
+                <button class="bsi-tab" data-range="1w">1W</button>
+                <button class="bsi-tab" data-range="1m">1M</button>
+              </div>
+            </div>
+            <svg id="bsi-homeChart" viewBox="0 0 900 180" style="width:100%;height:160px;display:block;"></svg>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column;">
+            <div class="card-hdr"><span class="card-title">觀察名單</span></div>
+            <div id="bsi-homeWatchlist" style="display:flex;flex-direction:column;gap:2px;flex:1;"></div>
+          </div>
+        </div>
+
+        <!-- 持倉明細 + 資產配置 + 績效摘要 -->
+        <div class="dash-grid" style="grid-template-columns:1fr 280px;align-items:start;">
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">持股明細</span></div>
+            <table style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr style="border-bottom:1px solid var(--divider);">
+                  <th style="text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:0 0 8px;text-transform:uppercase;letter-spacing:.05em;">股票</th>
+                  <th style="text-align:right;font-size:11px;font-weight:600;color:var(--muted);padding:0 0 8px;text-transform:uppercase;letter-spacing:.05em;">股數</th>
+                  <th style="text-align:right;font-size:11px;font-weight:600;color:var(--muted);padding:0 0 8px;text-transform:uppercase;letter-spacing:.05em;">市值</th>
+                  <th style="text-align:right;font-size:11px;font-weight:600;color:var(--muted);padding:0 0 8px;text-transform:uppercase;letter-spacing:.05em;">平均成本</th>
+                  <th style="text-align:right;font-size:11px;font-weight:600;color:var(--muted);padding:0 0 8px;text-transform:uppercase;letter-spacing:.05em;">回報率</th>
+                </tr>
+              </thead>
+              <tbody id="bsi-holdingsList"></tbody>
+            </table>
+          </div>
+          <div>
+            <div class="card" style="margin-bottom:12px;">
+              <div class="card-hdr"><span class="card-title">資產配置</span></div>
+              <div style="display:flex;justify-content:center;margin-bottom:12px;">
+                <svg id="bsi-pieChart" viewBox="0 0 160 160" style="width:140px;height:140px;"></svg>
+              </div>
+              <div id="bsi-pieLegend" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
+            <div class="card">
+              <div class="card-hdr"><span class="card-title">績效摘要</span></div>
+              <div id="bsi-portfolioSummary" style="display:flex;flex-direction:column;gap:8px;"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- DISCOVER / TOP 10 -->
+      <div id="bsi-screen-discover">
+        <div class="page-hdr">
+          <div class="page-title">市值 Top 10</div>
+        </div>
+        <div class="kpi-grid" id="bsi-discoverGrid" style="grid-template-columns:repeat(5,1fr);"></div>
+      </div>
+
+      <!-- DETAIL / MARKET -->
+      <div id="bsi-screen-detail">
+        <div class="dash-grid" style="grid-template-columns:1fr 340px;align-items:start;">
+          <!-- Left: chart + stats -->
+          <div>
+            <div class="card" style="margin-bottom:12px;">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                <div>
+                  <div style="font-size:28px;font-weight:700;letter-spacing:-.04em;color:var(--text);" id="bsi-detailSymbol">AAPL</div>
+                  <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="bsi-detailName">Apple Inc.</div>
+                  <div style="font-size:32px;font-weight:700;letter-spacing:-.04em;margin-top:6px;" id="bsi-detailPrice">—</div>
+                  <div id="bsi-detailDelta" style="font-size:13px;font-weight:600;margin-top:4px;color:var(--success);">—</div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                  <div style="display:flex;background:var(--surfaceOff);border-radius:8px;padding:3px;gap:2px;">
+                    <input type="text" id="bsi-searchInput" placeholder="搜尋股票…" style="border:none;background:transparent;font-size:12px;color:var(--text);outline:none;padding:4px 8px;width:110px;font-family:inherit;" autocomplete="off"/>
+                  </div>
+                  <button id="bsi-wlBtn" onclick="bsiToggleWatchlist()" style="padding:6px 14px;border:1px solid var(--divider);border-radius:var(--rFull);font-size:12px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--text);font-family:inherit;">☆ Watchlist</button>
+                </div>
+              </div>
+              <div id="bsi-tvChartContainer" style="width:100%;height:360px;border-radius:var(--r);overflow:hidden;"></div>
+              <!-- Hidden elements kept for JS compatibility -->
+              <span id="bsi-detailShares" style="display:none;"></span>
+              <span id="bsi-detailMktVal" style="display:none;"></span>
+              <span id="bsi-detailAvgCost" style="display:none;"></span>
+              <span id="bsi-detailTotalRet" style="display:none;"></span>
+              <span id="bsi-rangeLow" style="display:none;"></span>
+              <span id="bsi-rangeHigh" style="display:none;"></span>
+              <div id="bsi-rangeFill" style="display:none;"></div>
+              <div id="bsi-rangeDot" style="display:none;"></div>
+            </div>
+            <div class="card">
+              <div class="card-hdr"><span class="card-title">主要統計</span></div>
+              <div id="bsi-detailStats" style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px;"></div>
+            </div>
+          </div>
+          <!-- Right: trade panel -->
+          <div>
+            <div class="card" style="position:sticky;top:0;">
+              <div class="card-hdr"><span class="card-title">下單</span></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px;">
+                <button id="bsi-buyTab" onclick="bsiSwitchTab('buy')" style="padding:9px;border:none;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--success);color:#fff;">買入</button>
+                <button id="bsi-sellTab" onclick="bsiSwitchTab('sell')" style="padding:9px;border:none;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--surfaceOff);color:var(--muted);">賣出</button>
+              </div>
+              <div style="margin-bottom:10px;">
+                <div class="kpi-lbl" style="margin-bottom:4px;">股票代號</div>
+                <input class="bsi-inp" type="text" id="bsi-tradeSymbolInput" value="AAPL" oninput="bsiOnTradeSymbolChange()" style="width:100%;padding:9px 12px;border:1px solid var(--divider);border-radius:var(--r);font-size:14px;font-family:inherit;color:var(--text);background:var(--surfaceOff);outline:none;"/>
+              </div>
+              <div style="margin-bottom:10px;">
+                <div class="kpi-lbl" style="margin-bottom:4px;">訂單類型</div>
+                <select id="bsi-orderTypeSelect" onchange="bsiOnOrderTypeChange()" style="width:100%;padding:9px 12px;border:1px solid var(--divider);border-radius:var(--r);font-size:13px;font-family:inherit;color:var(--text);background:var(--surfaceOff);outline:none;">
+                  <option value="market">市價單</option>
+                  <option value="limit">限價單</option>
+                </select>
+              </div>
+              <div id="bsi-limitPriceField" style="display:none;margin-bottom:10px;">
+                <div class="kpi-lbl" style="margin-bottom:4px;">限價</div>
+                <input class="bsi-inp" type="number" id="bsi-limitPriceInput" step="0.01" oninput="bsiCalcEst()" style="width:100%;padding:9px 12px;border:1px solid var(--divider);border-radius:var(--r);font-size:14px;font-family:inherit;color:var(--text);background:var(--surfaceOff);outline:none;"/>
+              </div>
+              <div style="margin-bottom:10px;">
+                <div class="kpi-lbl" style="margin-bottom:4px;">股數</div>
+                <input class="bsi-inp" type="number" id="bsi-sharesInput" value="5" min="1" step="1" oninput="bsiCalcEst()" style="width:100%;padding:9px 12px;border:1px solid var(--divider);border-radius:var(--r);font-size:14px;font-family:inherit;color:var(--text);background:var(--surfaceOff);outline:none;"/>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:6px;">
+                  <button onclick="bsiQuickShares(0.25)" style="padding:5px;border:1px solid var(--divider);border-radius:var(--r);font-size:11px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--muted);font-family:inherit;">25%</button>
+                  <button onclick="bsiQuickShares(0.5)" style="padding:5px;border:1px solid var(--divider);border-radius:var(--r);font-size:11px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--muted);font-family:inherit;">50%</button>
+                  <button onclick="bsiQuickShares(0.75)" style="padding:5px;border:1px solid var(--divider);border-radius:var(--r);font-size:11px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--muted);font-family:inherit;">75%</button>
+                  <button onclick="bsiQuickShares(1)" style="padding:5px;border:1px solid var(--divider);border-radius:var(--r);font-size:11px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--muted);font-family:inherit;">最大</button>
+                </div>
+              </div>
+              <div style="margin-bottom:10px;">
+                <div class="kpi-lbl" style="margin-bottom:4px;">市價</div>
+                <input type="text" id="bsi-marketPriceDisplay" value="—" readonly style="width:100%;padding:9px 12px;border:1px solid var(--divider);border-radius:var(--r);font-size:14px;font-family:inherit;color:var(--muted);background:var(--surfaceOff);outline:none;"/>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--divider);border-bottom:1px solid var(--divider);margin-bottom:12px;">
+                <span style="font-size:12px;color:var(--muted);font-weight:600;">手續費</span>
+                <span style="font-size:12px;color:var(--muted);">$2</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <span style="font-size:12px;color:var(--muted);font-weight:600;">預計總計</span>
+                <span style="font-size:18px;font-weight:700;color:var(--text);" id="bsi-estValue">—</span>
+              </div>
+              <button id="bsi-tradeCtaBtn" onclick="bsiSubmitTrade()" style="width:100%;padding:12px;border:none;border-radius:var(--rFull);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--success);color:#fff;">確認買入</button>
+              <!-- Position info -->
+              <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--divider);">
+                <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;">你的持倉 — <span id="bsi-ordersPosSymbol">AAPL</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:12px;color:var(--muted);">總回報</span><span style="font-size:12px;font-weight:700;" id="bsi-posTotalRet">—</span></div>
+                <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--muted);">購買力</span><span style="font-size:12px;font-weight:700;" id="bsi-posBuyingPower">—</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+
+      <!-- ORDERS -->
+      <div id="bsi-screen-orders">
+        <div class="page-hdr">
+          <div class="page-title">交易記錄</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button onclick="bsiSetCapital()" style="padding:8px 16px;border:1px solid var(--primary);border-radius:var(--rFull);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:transparent;color:var(--primary);transition:all .15s;" onmouseover="this.style.background='var(--primary)';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='var(--primary)'">$ 設定初始資金</button>
+            <button onclick="bsiResetAccount()" style="padding:8px 16px;border:1px solid var(--error);border-radius:var(--rFull);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:transparent;color:var(--error);transition:all .15s;" onmouseover="this.style.background='var(--error)';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='var(--error)'">↺ 重設模擬帳戶</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div>
+            <!-- Pending Orders -->
+            <div class="card" style="margin-bottom:12px;">
+              <div class="card-hdr"><span class="card-title">待處理限價單</span></div>
+              <div id="bsi-pendingOrdersList"></div>
+            </div>
+            <!-- Order History -->
+            <div class="card">
+              <div class="card-hdr">
+                <span class="card-title">訂單記錄</span>
+                <div style="display:flex;gap:4px;">
+                  <button class="bsi-filter-btn active" data-filter="all">全部</button>
+                  <button class="bsi-filter-btn" data-filter="buy">買入</button>
+                  <button class="bsi-filter-btn" data-filter="sell">賣出</button>
+                  <button class="bsi-filter-btn" data-filter="this-month">本月</button>
+                </div>
+              </div>
+              <div id="bsi-ordersList"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /view-blackinvest -->
+
+
 
   </div>
 </div>
@@ -2982,7 +3320,7 @@ const I18N = {
     // Add position btn
     'btn-add-position':'新增持倉',
     // Bottom nav
-    'bnav-dashboard':'總覽','bnav-monthly':'每月','bnav-invest':'投資','bnav-categories':'類別','bnav-goals':'目標',
+    'bnav-dashboard':'總覽','bnav-monthly':'每月','bnav-invest':'投資','bnav-categories':'類別','bnav-goals':'目標','nav-blackinvest':'模擬交易','bnav-blackinvest':'模擬交易',
     // Sign out / auth
     'btn-signout':'登出',
     // Search
@@ -3062,7 +3400,7 @@ const I18N = {
     'modal-add-inv':'Add Position','lbl-symbol':'Symbol / Name','lbl-qty':'Quantity','lbl-avg-cost-unit':'Avg Cost (per unit)','lbl-currency':'Currency','btn-add-inv':'Add',
     'modal-edit-inv':'Edit Position',
     'btn-add-position':'Add Position',
-    'bnav-dashboard':'Dashboard','bnav-monthly':'Monthly','bnav-invest':'Invest','bnav-categories':'Categories','bnav-goals':'Goals',
+    'bnav-dashboard':'Dashboard','bnav-monthly':'Monthly','bnav-invest':'Invest','bnav-categories':'Categories','bnav-goals':'Goals','nav-blackinvest':'Sim Trading','bnav-blackinvest':'Sim Trade',
     'btn-signout':'Sign Out',
     'ph-search-tx':'Search transactions…','ph-search-all':'Search…',
     'card-spending':'Spending by Category','card-bva':'Budget vs Actual',
@@ -3107,6 +3445,10 @@ function applyLang(){
   document.querySelector('.nav-btn[data-view="investments"]').setAttribute('data-tip', t('nav-investments'));
   document.querySelector('.nav-btn[data-view="categories"]').setAttribute('data-tip', t('nav-categories'));
   document.querySelector('.nav-btn[data-view="goals"]').setAttribute('data-tip', t('nav-goals'));
+  const bsiNavBtn = document.querySelector('.nav-btn[data-view="blackinvest"] .nav-btn-label');
+  if(bsiNavBtn) bsiNavBtn.textContent = t('nav-blackinvest');
+  const bsiNavTip = document.querySelector('.nav-btn[data-view="blackinvest"]');
+  if(bsiNavTip) bsiNavTip.setAttribute('data-tip', t('nav-blackinvest'));
 
   // Settings menu (export/import are now inside settings) — values update via data-i18n
   updateSettingsMenuValues();
@@ -3133,7 +3475,7 @@ function applyLang(){
     const v = b.dataset.view;
     const span = b.querySelector('.bnav-label');
     if(span){
-      const keys = {dashboard:'bnav-dashboard',monthly:'bnav-monthly',investments:'bnav-invest',categories:'bnav-categories',goals:'bnav-goals'};
+      const keys = {dashboard:'bnav-dashboard',monthly:'bnav-monthly',investments:'bnav-invest',categories:'bnav-categories',goals:'bnav-goals',blackinvest:'bnav-blackinvest'};
       if(keys[v]) span.textContent = t(keys[v]);
     }
   });
@@ -3236,12 +3578,15 @@ function applyLang(){
 $('lang-btn')?.addEventListener('click', ()=>{
   curLang = curLang==='zh' ? 'en' : 'zh';
   applyLang();
+  if(typeof bsiApplyLang === 'function') bsiApplyLang();
 });
 function toggleLang(){
   curLang = curLang==='zh' ? 'en' : 'zh';
   try { localStorage.setItem(LANG_KEY, curLang); } catch(_){}
   applyLang();
   updateSettingsMenuValues();
+  // 同步更新模擬交易的語言
+  if(typeof bsiApplyLang === 'function') bsiApplyLang();
 }
 
 
@@ -4699,16 +5044,13 @@ function renderDashBar(catMap, containerId) {
 }
 
 // ── DONUT CHART TOGGLE ───────────────────────────────────────────
-document.addEventListener('click', e => {
-  const btn = e.target.closest('.chart-toggle-btn');
-  if (!btn) return;
-  const toggle = btn.closest('.chart-toggle');
-  toggle.querySelectorAll('.chart-toggle-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const isDonut = btn.dataset.chart === 'donut';
+let _dashChartMode = 'donut'; // 'donut' | 'bar'
+function dashCycleChart(){
+  _dashChartMode = _dashChartMode === 'donut' ? 'bar' : 'donut';
+  const isDonut = _dashChartMode === 'donut';
   $('dash-donut-wrap').style.display = isDonut ? '' : 'none';
   $('dash-bar-wrap').style.display   = isDonut ? 'none' : '';
-});
+}
 
 // ── CATEGORY RANGE TOGGLE (annual / monthly) ─────────────────────
 window._dashCatRange = 'annual';  // 'annual' | 'monthly'
@@ -5103,6 +5445,747 @@ window.addEventListener('resize', () => {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
       <span class="bnav-label">Goals</span>
     </button>
+    <button class="bottom-nav-btn" data-view="blackinvest">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="3" x2="6" y2="6"/><rect x="4" y="6" width="4" height="6" rx="0.5"/><line x1="6" y1="12" x2="6" y2="15"/><line x1="12" y1="5" x2="12" y2="8"/><rect x="10" y="8" width="4" height="7" rx="0.5"/><line x1="12" y1="15" x2="12" y2="18"/><line x1="18" y1="2" x2="18" y2="5"/><rect x="16" y="5" width="4" height="5" rx="0.5"/><line x1="18" y1="10" x2="18" y2="13"/></svg>
+      <span class="bnav-label">模擬交易</span>
+    </button>
   </nav>
 
+
+<!-- ══════════ BLACKINVEST MODULE JS ══════════ -->
+<script type="module">
+import {
+  collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc,
+  getDocs, query, orderBy, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+(function(){
+  'use strict';
+
+  const BSI_API = "https://blackinvest.markchanchun.workers.dev";
+  const BSI_TOP10 = ["NVDA","GOOGL","AAPL","MSFT","AMZN","TSM","AVGO","META","TSLA","WMT"];
+  const BSI_PIE_COLORS = ["#0071e3","#34c759","#ff9500","#ff3b30","#af52de","#5ac8fa","#ffcc00","#30d158"];
+
+  const BSI = {
+    symbol:"AAPL", tradeSide:"buy", tradeType:"market", orderFilter:"all",
+    homeRange:"1d", watchlist:[], account:{startingBalance:100000,cash:100000},
+    holdings:{}, orders:[], pendingOrders:[], quotes:{}, profiles:{}, metrics:{},
+    pendingTrade:null, isTrading:false, initialised:false,
+  };
+
+  function bsiDB(){ return window._bsDb; }
+  function bsiUID(){
+    try{ if(window._bsAuth?.currentUser?.uid) return window._bsAuth.currentUser.uid; }catch(e){}
+    return "bsi_anonymous";
+  }
+  function bsiAccountRef(){ return doc(bsiDB(),"bsi_users",bsiUID(),"account","data"); }
+  function bsiHoldingsCol(){ return collection(bsiDB(),"bsi_users",bsiUID(),"holdings"); }
+  function bsiHoldingRef(sym){ return doc(bsiDB(),"bsi_users",bsiUID(),"holdings",sym); }
+  function bsiOrdersCol(){ return collection(bsiDB(),"bsi_users",bsiUID(),"orders"); }
+  function bsiPendingCol(){ return collection(bsiDB(),"bsi_users",bsiUID(),"pendingOrders"); }
+  function bsiPendingRef(id){ return doc(bsiDB(),"bsi_users",bsiUID(),"pendingOrders",id); }
+
+  const bsiMoney = v => "$"+Number(v||0).toLocaleString("en-US",{maximumFractionDigits:0});
+  const bsiNum = (v,d=2) => Number(v||0).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+  const bsiPct = v => { const n=Number(v||0); return (n>=0?"+":"")+n.toFixed(2)+"%"; };
+  const bsiSignedMoney = v => { const n=Number(v||0); return (n>=0?"+":"-")+bsiMoney(Math.abs(n)); };
+  const bsiColorFor = v => Number(v)>=0?"var(--success)":"var(--error)";
+  const bsiClsFor = v => Number(v)>=0?"up":"down";
+  const bsiFormatDate = val => {
+    const d=val?.toDate?val.toDate():new Date(val);
+    if(isNaN(d.getTime()))return"Just now";
+    return d.toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+  };
+
+  const bsiHoldingMV = sym => { const h=BSI.holdings[sym]; return h?(h.shares||0)*(BSI.quotes[sym]?.c||h.avgCost||0):0; };
+  const bsiPortfolioValue = () => Object.keys(BSI.holdings).reduce((s,sym)=>s+bsiHoldingMV(sym),0);
+  const bsiTotalValue = () => (BSI.account.cash||0)+bsiPortfolioValue();
+  const bsiTotalRet = () => bsiTotalValue()-(BSI.account.startingBalance||0);
+  const bsiTotalRetPct = () => (bsiTotalRet()/(BSI.account.startingBalance||1))*100;
+
+  function bsiToast(msg,type="info"){
+    const el=document.createElement("div");
+    const bg=type==="success"?"#30d158":type==="error"?"#ff453a":"#007aff";
+    el.style.cssText="position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:"+bg+";color:#fff;padding:11px 20px;border-radius:999px;font-size:13px;font-weight:700;z-index:99999;pointer-events:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25);";
+    el.textContent=msg;document.body.appendChild(el);
+    setTimeout(()=>{el.style.opacity="0";el.style.transition="opacity .3s";setTimeout(()=>el.remove(),300);},2500);
+  }
+  function bsiShowLoading(){window.showLoading?.("載入中…");}
+  function bsiHideLoading(){window.hideLoading?.();}
+
+  // Modal
+  function bsiGetModal(){
+    let ov=document.getElementById("bsi-tradeModal");
+    if(!ov){
+      ov=document.createElement("div");ov.id="bsi-tradeModal";ov.className="bsi-modal-overlay";
+      ov.innerHTML=`<div class="bsi-modal-card">
+        <div style="font-size:18px;font-weight:700;margin-bottom:4px;" id="bsi-modalTitle"></div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;" id="bsi-modalSub"></div>
+        <div id="bsi-modalDetail" style="margin-bottom:18px;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <button onclick="bsiCloseModal()" style="padding:12px;border:1px solid var(--divider);border-radius:var(--rFull);font-size:14px;font-weight:700;cursor:pointer;background:var(--surface);color:var(--muted);font-family:inherit;">取消</button>
+          <button id="bsi-modalConfirmBtn" style="padding:12px;border:none;border-radius:var(--rFull);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;color:#fff;"></button>
+        </div>
+      </div>`;
+      document.body.appendChild(ov);
+      ov.addEventListener("click",e=>{if(e.target===ov)bsiCloseModal();});
+    }
+    return ov;
+  }
+  function bsiOpenModal(title,sub,detailHTML,confirmLabel,confirmBg,onConfirm){
+    const ov=bsiGetModal();
+    document.getElementById("bsi-modalTitle").textContent=title;
+    document.getElementById("bsi-modalSub").textContent=sub;
+    document.getElementById("bsi-modalDetail").innerHTML=detailHTML;
+    const btn=document.getElementById("bsi-modalConfirmBtn");
+    btn.textContent=confirmLabel;btn.style.background=confirmBg;btn.onclick=onConfirm;
+    ov.classList.add("open");
+  }
+  window.bsiCloseModal=function(){document.getElementById("bsi-tradeModal")?.classList.remove("open");BSI.pendingTrade=null;};
+
+  // Charts
+  function bsiGeneratePriceHistory(base,change,days){
+    const pts=[],steps=Math.min(days,90),ns=Math.max(Math.abs(change),base*0.0001)*0.02;
+    let price=base-change*days*0.5;
+    for(let i=0;i<=steps;i++){const t=i/steps,drift=change*days*t,noise=(Math.random()-0.5)*ns*Math.sqrt(Math.max(days,1)/Math.max(steps,1));pts.push(Math.max(price+drift+noise,base*0.5));}
+    pts[pts.length-1]=base;return pts;
+  }
+  function bsiDrawLineChart(svgEl,data){
+    if(!svgEl||!data.length)return;
+    const w=900,h=180,pt=10,pb=10,ch=h-pt-pb;
+    svgEl.setAttribute("viewBox","0 0 "+w+" "+h);
+    const mn=Math.min(...data)*.99,mx=Math.max(...data)*1.01,r=mx-mn||1;
+    const pts=data.map((v,i)=>{const x=(i/Math.max(data.length-1,1))*w,y=pt+ch-((v-mn)/r)*ch;return(i===0?"M":"L")+x.toFixed(1)+","+y.toFixed(1);}).join(" ");
+    const up=data[data.length-1]>=data[0];
+    const c=up?"var(--primary)":"var(--error)";
+    const gid="bsig"+(up?"u":"d");
+    svgEl.innerHTML=`<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${c}" stop-opacity=".12"/><stop offset="100%" stop-color="${c}" stop-opacity="0"/></linearGradient></defs><path d="${pts}" stroke="${c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="${pts} L${w},${pt+ch} L0,${pt+ch} Z" fill="url(#${gid})"/>`;
+  }
+  function bsiDrawPieChart(svgEl,segs,size=160){
+    const cx=size/2,cy=size/2,r=56;
+    const tot=segs.reduce((s,sg)=>s+sg.value,0);if(tot===0){svgEl.innerHTML="";return;}
+    let angle=-Math.PI/2,paths="";
+    segs.forEach(seg=>{
+      const slice=(seg.value/tot)*Math.PI*2;if(slice<=0)return;
+      if(slice>=Math.PI*1.99){paths+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${seg.color}" stroke="var(--surface)" stroke-width="2"/>`;}
+      else{const x1=cx+r*Math.cos(angle),y1=cy+r*Math.sin(angle),x2=cx+r*Math.cos(angle+slice),y2=cy+r*Math.sin(angle+slice),large=slice>Math.PI?1:0;paths+=`<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${seg.color}" stroke="var(--surface)" stroke-width="2"/>`;}
+      angle+=slice;
+    });
+    svgEl.setAttribute("viewBox","0 0 "+size+" "+size);
+    svgEl.innerHTML=paths+`<circle cx="${cx}" cy="${cy}" r="20" fill="var(--surface)"/>`;
+  }
+  function bsiDrawRangeBar(low,high,cur){
+    const f=document.getElementById("bsi-rangeFill"),d=document.getElementById("bsi-rangeDot");
+    if(!f||!d)return;
+    const p=Math.max(0,Math.min(1,(cur-low)/(high-low||1)))*100;
+    f.style.width=p+"%";d.style.left=p+"%";
+    const lo=document.getElementById("bsi-rangeLow"),hi=document.getElementById("bsi-rangeHigh");
+    if(lo)lo.textContent=bsiMoney(low);if(hi)hi.textContent=bsiMoney(high);
+  }
+  function bsiLoadTVChart(sym){
+    const c=document.getElementById("bsi-tvChartContainer");if(!c)return;
+    const isDark=document.documentElement.getAttribute("data-theme")==="dark";
+    c.innerHTML=`<div class="tradingview-widget-container" style="height:360px;width:100%;"><div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%;"></div></div>`;
+    const s=document.createElement("script");
+    s.src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+    s.textContent=JSON.stringify({autosize:true,symbol:sym,interval:"D",timezone:"Etc/UTC",theme:isDark?"dark":"light",style:"1",locale:"en",allow_symbol_change:false,calendar:false,hide_side_toolbar:true,hide_top_toolbar:false,backgroundColor:isDark?"rgba(0,0,0,0)":"rgba(255,255,255,0)"});
+    c.querySelector(".tradingview-widget-container").appendChild(s);
+  }
+
+  // Navigation
+  function bsiNavigate(name){
+    ["home","detail","discover","orders"].forEach(s=>{
+      document.getElementById("bsi-screen-"+s)?.classList.toggle("active",s===name);
+    });
+    document.querySelectorAll(".bsi-subnav-btn").forEach(b=>{
+      const isActive = b.dataset.bsi===name;
+      b.classList.toggle("active", isActive);
+      b.style.background = isActive ? "var(--surface)" : "transparent";
+      b.style.color = isActive ? "var(--primary)" : "var(--muted)";
+      b.style.boxShadow = isActive ? "var(--shadow)" : "none";
+    });
+    window.scrollTo({top:0,behavior:"smooth"});
+    if(name==="home")bsiRenderHome();
+    if(name==="detail")bsiRenderDetail();
+    if(name==="discover")bsiRenderDiscover();
+    if(name==="orders"){bsiRenderPendingOrders();bsiRenderOrders();bsiRenderOrderPosition();}
+    // Apply language after every navigation render
+    setTimeout(()=>{ if(typeof bsiApplyLang==="function") bsiApplyLang(); }, 50);
+  }
+  window.bsiNavigate=bsiNavigate;
+
+  // Trade controls
+  window.bsiSwitchTab=function(tab){
+    BSI.tradeSide=tab;
+    const buy=document.getElementById("bsi-buyTab"),sell=document.getElementById("bsi-sellTab");
+    if(buy){buy.style.background=tab==="buy"?"var(--success)":"var(--surfaceOff)";buy.style.color=tab==="buy"?"#fff":"var(--muted)";}
+    if(sell){sell.style.background=tab==="sell"?"var(--error)":"var(--surfaceOff)";sell.style.color=tab==="sell"?"#fff":"var(--muted)";}
+    const cta=document.getElementById("bsi-tradeCtaBtn");
+    if(cta){cta.style.background=tab==="buy"?"var(--success)":"var(--error)";cta.textContent=tab==="buy"?"確認買入":"確認賣出";}
+    bsiCalcEst();
+  };
+  window.bsiOnOrderTypeChange=function(){
+    BSI.tradeType=document.getElementById("bsi-orderTypeSelect")?.value||"market";
+    document.getElementById("bsi-limitPriceField").style.display=BSI.tradeType==="limit"?"block":"none";
+    bsiCalcEst();
+  };
+  window.bsiOnTradeSymbolChange=function(){
+    const inp=document.getElementById("bsi-tradeSymbolInput");if(!inp)return;
+    BSI.symbol=inp.value.trim().toUpperCase()||"AAPL";
+    bsiRenderOrderPosition();bsiCalcEst();
+  };
+
+  window.bsiCalcEst=function(){
+    const shares=parseFloat(document.getElementById("bsi-sharesInput")?.value)||0;
+    const mp=BSI.quotes[BSI.symbol]?.c||0;
+    const price=BSI.tradeType==="limit"?(parseFloat(document.getElementById("bsi-limitPriceInput")?.value)||0):mp;
+    const disp=document.getElementById("bsi-marketPriceDisplay");if(disp)disp.value=bsiMoney(mp);
+    const estEl=document.getElementById("bsi-estValue");
+    if(estEl)estEl.textContent=bsiMoney(shares*(BSI.tradeType==="limit"&&price>0?price:mp)+2);
+  };
+  window.bsiQuickShares=function(frac){
+    const price=BSI.quotes[BSI.symbol]?.c||0;
+    const max=BSI.tradeSide==="buy"?Math.floor(((BSI.account.cash||0)-2)/Math.max(price,0.01)):(BSI.holdings[BSI.symbol]?.shares||0);
+    const inp=document.getElementById("bsi-sharesInput");if(inp)inp.value=Math.max(1,Math.floor(max*frac));
+    bsiCalcEst();
+  };
+  function bsiOpenSymbol(sym){
+    BSI.symbol=sym;
+    const tsi=document.getElementById("bsi-tradeSymbolInput");if(tsi)tsi.value=sym;
+
+    bsiNavigate("detail");
+  }
+  window.bsiOpenSymbol=bsiOpenSymbol;
+  window.bsiToggleWatchlist=function(){
+    const idx=BSI.watchlist.indexOf(BSI.symbol);
+    if(idx>=0){BSI.watchlist.splice(idx,1);bsiToast(BSI.symbol+" 已移出觀察名單","error");}
+    else{BSI.watchlist.push(BSI.symbol);bsiToast(BSI.symbol+" 已加入觀察名單","success");}
+    bsiRenderDetail();bsiRenderHome();
+  };
+
+  // Submit trade
+  window.bsiSubmitTrade=function(){
+    const shares=parseInt(document.getElementById("bsi-sharesInput")?.value);
+    if(!shares||shares<=0){bsiToast("請輸入有效股數","error");return;}
+    const mp=BSI.quotes[BSI.symbol]?.c;if(!mp){bsiToast("無法取得市價","error");return;}
+    const price=BSI.tradeType==="limit"?parseFloat(document.getElementById("bsi-limitPriceInput")?.value):mp;
+    if(BSI.tradeType==="limit"&&(!price||price<=0)){bsiToast("請輸入限價","error");return;}
+    const total=shares*price+2,h=BSI.holdings[BSI.symbol]||{shares:0,avgCost:0};
+    if(BSI.tradeSide==="buy"&&(BSI.account.cash||0)<total){bsiToast("購買力不足","error");return;}
+    if(BSI.tradeSide==="sell"&&(h.shares||0)<shares){bsiToast("持股不足","error");return;}
+    BSI.pendingTrade={symbol:BSI.symbol,side:BSI.tradeSide,type:BSI.tradeType==="limit"?"limit":"market",shares,price,total};
+    const mkRow=(l,v)=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--divider);font-size:13px;"><span style="color:var(--muted);">${l}</span><span style="font-weight:700;">${v}</span></div>`;
+    const dh=mkRow("股票",BSI.symbol)+mkRow("股數",shares)+mkRow("市價",bsiMoney(mp))+mkRow("手續費","$2")+mkRow("預計總計",bsiMoney(total))+(BSI.tradeSide==="sell"?mkRow("預計損益",bsiSignedMoney((price-h.avgCost)*shares)):"");
+    if(BSI.tradeType==="limit") bsiOpenModal("確認限價訂單","當股價達到限價時自動成交。",dh,"掛單","var(--primary)",bsiConfirmLimitTrade);
+    else bsiOpenModal(BSI.tradeSide==="buy"?"確認買入":"確認賣出","請確認你的訂單",dh,BSI.tradeSide==="buy"?"確認買入":"確認賣出",BSI.tradeSide==="buy"?"var(--success)":"var(--error)",bsiConfirmTrade);
+  };
+
+  async function bsiConfirmTrade(){
+    if(!BSI.pendingTrade||BSI.isTrading)return;
+    BSI.isTrading=true;const t=BSI.pendingTrade;bsiShowLoading();
+    try{
+      const cur=BSI.holdings[t.symbol]||{shares:0,avgCost:0};
+      const ap=t.type==="limit"?t.price:BSI.quotes[t.symbol]?.c||t.price;
+      const at=t.shares*ap+2;
+      if(t.side==="buy"){
+        if((BSI.account.cash||0)<at)throw new Error("資金不足");
+        const ns=(cur.shares||0)+t.shares;
+        await setDoc(bsiHoldingRef(t.symbol),{symbol:t.symbol,shares:ns,avgCost:(((cur.shares||0)*(cur.avgCost||0))+at)/ns,updatedAt:serverTimestamp()});
+        await updateDoc(bsiAccountRef(),{cash:(BSI.account.cash||0)-at});
+      }else{
+        if((cur.shares||0)<t.shares)throw new Error("持股不足");
+        const ns=(cur.shares||0)-t.shares,sp=t.shares*ap-2;
+        if(ns<=0)await deleteDoc(bsiHoldingRef(t.symbol));
+        else await updateDoc(bsiHoldingRef(t.symbol),{shares:ns,updatedAt:serverTimestamp()});
+        await updateDoc(bsiAccountRef(),{cash:(BSI.account.cash||0)+sp});
+      }
+      await addDoc(bsiOrdersCol(),{symbol:t.symbol,side:t.side,type:t.type,shares:t.shares,price:ap,total:at,createdAt:serverTimestamp()});
+      const inp=document.getElementById("bsi-sharesInput");if(inp)inp.value="";
+      window.bsiCloseModal();
+      await bsiLoadAccount();await bsiLoadHoldings();await bsiLoadOrders();
+      bsiRenderHome();bsiRenderDetail();bsiRenderOrderPosition();bsiRenderOrders();
+      bsiToast((t.side==="buy"?"買入":"賣出")+" "+t.shares+" "+t.symbol+" @ "+bsiMoney(ap),t.side==="buy"?"success":"error");
+    }catch(e){bsiToast("交易失敗："+(e.message||"錯誤"),"error");}
+    finally{BSI.isTrading=false;BSI.pendingTrade=null;bsiHideLoading();}
+  }
+  window.bsiConfirmTrade=bsiConfirmTrade;
+
+  async function bsiConfirmLimitTrade(){
+    if(!BSI.pendingTrade||BSI.isTrading)return;
+    BSI.isTrading=true;const t=BSI.pendingTrade;bsiShowLoading();
+    try{
+      await addDoc(bsiPendingCol(),{symbol:t.symbol,side:t.side,type:"limit",shares:t.shares,price:t.price,total:t.total,createdAt:serverTimestamp()});
+      window.bsiCloseModal();await bsiLoadPendingOrders();bsiRenderPendingOrders();bsiRenderOrders();
+      bsiToast("限價單已掛出："+t.symbol+" @ "+bsiMoney(t.price),"success");
+    }catch(e){bsiToast("失敗："+e.message,"error");}
+    finally{BSI.isTrading=false;BSI.pendingTrade=null;bsiHideLoading();}
+  }
+
+  window.bsiCancelPendingOrder=async function(id){
+    bsiShowLoading();
+    try{await deleteDoc(bsiPendingRef(id));await bsiLoadPendingOrders();bsiRenderPendingOrders();bsiToast("已取消","error");}
+    catch(e){bsiToast("失敗："+e.message,"error");}
+    finally{bsiHideLoading();}
+  };
+
+  async function bsiCheckPendingOrders(){
+    for(const po of BSI.pendingOrders){
+      const q=BSI.quotes[po.symbol]||{};const p=q.c||0;if(!p)continue;
+      const ok=(po.side==="buy"&&p<=po.price)||(po.side==="sell"&&p>=po.price);if(!ok)continue;
+      try{
+        const cur=BSI.holdings[po.symbol]||{shares:0,avgCost:0};
+        if(po.side==="buy"){
+          if((BSI.account.cash||0)<po.total)continue;
+          const ns=(cur.shares||0)+po.shares;
+          await setDoc(bsiHoldingRef(po.symbol),{symbol:po.symbol,shares:ns,avgCost:(((cur.shares||0)*(cur.avgCost||0))+po.total)/ns,updatedAt:serverTimestamp()});
+          await updateDoc(bsiAccountRef(),{cash:(BSI.account.cash||0)-po.total});
+        }else{
+          if((cur.shares||0)<po.shares)continue;
+          const ns=(cur.shares||0)-po.shares,sp=po.shares*po.price-2;
+          if(ns<=0)await deleteDoc(bsiHoldingRef(po.symbol));
+          else await updateDoc(bsiHoldingRef(po.symbol),{shares:ns,updatedAt:serverTimestamp()});
+          await updateDoc(bsiAccountRef(),{cash:(BSI.account.cash||0)+sp});
+        }
+        await addDoc(bsiOrdersCol(),{symbol:po.symbol,side:po.side,type:"limit",shares:po.shares,price:po.price,total:po.total,createdAt:serverTimestamp()});
+        await deleteDoc(bsiPendingRef(po.id));
+        bsiToast("限價單成交："+po.symbol+" @ "+bsiMoney(po.price),"success");
+      }catch(e){}
+    }
+    await bsiLoadPendingOrders();await bsiLoadAccount();await bsiLoadHoldings();await bsiLoadOrders();
+    bsiRenderHome();bsiRenderOrderPosition();bsiRenderOrders();bsiRenderPendingOrders();
+  }
+
+  // Data loading
+  async function bsiEnsureAccount(){
+    try{const snap=await getDoc(bsiAccountRef());if(!snap.exists())await setDoc(bsiAccountRef(),{startingBalance:100000,cash:100000,displayName:"Trader",createdAt:serverTimestamp()});}catch(e){}
+  }
+  async function bsiLoadAccount(){
+    try{const snap=await getDoc(bsiAccountRef());if(!snap.exists()){await bsiEnsureAccount();}const data=snap.data()||{};BSI.account={...BSI.account,...data};if(!BSI.account.startingBalance)BSI.account.startingBalance=100000;if(!BSI.account.cash&&BSI.account.cash!==0)BSI.account.cash=100000;}catch(e){}
+  }
+  async function bsiLoadHoldings(){
+    try{BSI.holdings={};const snap=await getDocs(bsiHoldingsCol());snap.forEach(d=>{BSI.holdings[d.id]=d.data();});}catch(e){}
+  }
+  async function bsiLoadPendingOrders(){
+    try{BSI.pendingOrders=[];const snap=await getDocs(bsiPendingCol());snap.forEach(d=>BSI.pendingOrders.push({id:d.id,...d.data()}));}catch(e){}
+  }
+  async function bsiLoadOrders(){
+    try{BSI.orders=[];const q2=query(bsiOrdersCol(),orderBy("createdAt","desc"));const snap=await getDocs(q2);snap.forEach(d=>BSI.orders.push({id:d.id,...d.data()}));}
+    catch(e){try{BSI.orders=[];const snap=await getDocs(bsiOrdersCol());snap.forEach(d=>BSI.orders.push({id:d.id,...d.data()}));BSI.orders.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));}catch(e2){}}
+  }
+  async function bsiLoadOneSym(s){
+    try{
+      const[q,p,m]=await Promise.all([
+        fetch(BSI_API+"/quote?symbol="+encodeURIComponent(s)).then(r=>r.json()),
+        fetch(BSI_API+"/profile2?symbol="+encodeURIComponent(s)).then(r=>r.json()),
+        fetch(BSI_API+"/metric?symbol="+encodeURIComponent(s)).then(r=>r.json()),
+      ]);
+      BSI.quotes[s]=q||{};BSI.profiles[s]=p||{};BSI.metrics[s]=m?.metric||m||{};
+    }catch(e){}
+  }
+  async function bsiLoadMarketData(opts={}){
+    // Priority 1: 用戶持倉 + watchlist + 當前symbol（立刻載入）
+    const priority=[...new Set([...BSI.watchlist,...Object.keys(BSI.holdings),BSI.symbol])];
+    await Promise.all(priority.map(s=>bsiLoadOneSym(s)));
+    // Priority 2: TOP10（背景載入，不阻塞UI）
+    if(!opts.skipTop10){
+      const top10Missing=BSI_TOP10.filter(s=>!BSI.quotes[s]?.c);
+      if(top10Missing.length){
+        // 分批載入TOP10，每批5個，避免同時發太多請求
+        for(let i=0;i<top10Missing.length;i+=5){
+          await Promise.all(top10Missing.slice(i,i+5).map(s=>bsiLoadOneSym(s)));
+        }
+        bsiRenderDiscover();
+      }
+    }
+  }
+
+  // Rendering
+  function bsiRenderHome(){
+    const tv=bsiTotalRet(),tvp=bsiTotalRetPct(),pv=bsiPortfolioValue(),tvv=bsiTotalValue();
+    const el=document.getElementById("bsi-homeTotalValue");if(el)el.textContent=bsiMoney(tvv);
+    const badge=document.getElementById("bsi-homeDelta");
+    if(badge){badge.textContent=(tv>=0?"▲ ":"▼ ")+bsiSignedMoney(tv)+" ("+(tvp>=0?"+":"")+tvp.toFixed(2)+"%) 總回報";badge.style.color=tv>=0?"var(--success)":"var(--error)";}
+    const bp=document.getElementById("bsi-homeBuyingPower");if(bp)bp.textContent=bsiMoney(BSI.account.cash||0);
+    const pv2=document.getElementById("bsi-homePortValue");if(pv2)pv2.textContent=bsiMoney(pv);
+    const cs=document.getElementById("bsi-homeChart");
+    if(cs){const sb=BSI.account.startingBalance||100000;const pnl=tvv-sb;const days={"1d":1,"1w":7,"1m":30}[BSI.homeRange]||1;bsiDrawLineChart(cs,bsiGeneratePriceHistory(tvv,pnl/Math.max(days,1),days));}
+    // Holdings count
+    const hc=document.getElementById("bsi-holdingsCount");
+    if(hc)hc.textContent=Object.keys(BSI.holdings).length+" 股票";
+    // Watchlist
+    const le=document.getElementById("bsi-homeWatchlist");if(le){le.innerHTML="";
+    if(!BSI.watchlist.length){le.innerHTML='';}
+    else{BSI.watchlist.forEach(sym=>{
+      const q=BSI.quotes[sym]||{};const up=(q.dp||0)>=0;
+      const row=document.createElement("div");row.className="bsi-wl-item";row.onclick=()=>bsiOpenSymbol(sym);
+      row.innerHTML=`<div><div style="font-size:14px;font-weight:700;">${sym}</div><div style="font-size:11px;color:var(--muted);">${BSI.profiles[sym]?.name||""}</div></div><div style="text-align:right;"><div style="font-size:14px;font-weight:700;">${q.c?bsiMoney(q.c):"—"}</div><div style="font-size:12px;font-weight:600;color:${up?"var(--success)":"var(--error)"};">${bsiPct(q.dp||0)}</div></div>`;
+      le.appendChild(row);
+    });}}
+    // Render portfolio section (holdings + pie + summary)
+    bsiRenderPortfolio();
+  }
+
+  function bsiRenderDetail(){
+    const q=BSI.quotes[BSI.symbol]||{},p=BSI.profiles[BSI.symbol]||{},m=BSI.metrics[BSI.symbol]||{};
+    const h=BSI.holdings[BSI.symbol]||{shares:0,avgCost:0};
+    const price=q.c||0,val=(h.shares||0)*price,tRetPct=h.avgCost?((price-h.avgCost)/h.avgCost)*100:0;
+    const qs=s=>document.getElementById(s);
+    if(qs("bsi-detailSymbol"))qs("bsi-detailSymbol").textContent=BSI.symbol;
+    if(qs("bsi-detailName"))qs("bsi-detailName").textContent=(p.name||BSI.symbol)+" · "+(p.exchange||"NASDAQ");
+    if(qs("bsi-detailPrice")){qs("bsi-detailPrice").textContent=bsiMoney(price);qs("bsi-detailPrice").style.color=q.d>=0?"var(--success)":"var(--error)";}
+    if(qs("bsi-detailDelta")){qs("bsi-detailDelta").textContent=((q.d||0)>=0?"▲ ":"▼ ")+bsiSignedMoney(q.d||0)+" ("+((q.dp||0)>=0?"+":"")+bsiNum(q.dp||0)+"%) 今日";qs("bsi-detailDelta").style.color=(q.d||0)>=0?"var(--success)":"var(--error)";}
+    const wb=qs("bsi-wlBtn");if(wb){const w=BSI.watchlist.includes(BSI.symbol);wb.textContent=w?"★ Watchlist":"☆ Watchlist";wb.style.color=w?"var(--primary)":"var(--text)";wb.style.borderColor=w?"var(--primary)":"var(--divider)";}
+    bsiLoadTVChart(BSI.symbol);
+    if(qs("bsi-detailShares"))qs("bsi-detailShares").textContent=bsiNum(h.shares||0,0);
+    if(qs("bsi-detailMktVal"))qs("bsi-detailMktVal").textContent=bsiMoney(val);
+    if(qs("bsi-detailAvgCost"))qs("bsi-detailAvgCost").textContent=bsiMoney(h.avgCost||0);
+    if(qs("bsi-detailTotalRet")){qs("bsi-detailTotalRet").textContent=bsiPct(tRetPct);qs("bsi-detailTotalRet").style.color=bsiColorFor(tRetPct);}
+    const lo=m["52WeekLow"]||q.l||price*0.8,hi=m["52WeekHigh"]||q.h||price*1.2;
+    bsiDrawRangeBar(lo,hi,price);
+    const se=qs("bsi-detailStats");
+    if(se){
+      const iZhD=typeof curLang!=='undefined'&&curLang==='zh';
+      const mkRow=(l,v)=>`<div class="bsi-stat-line"><span style="color:var(--muted);">${l}</span><span style="font-weight:600;">${v}</span></div>`;
+      se.innerHTML=`<div>${mkRow(iZhD?"開盤":"Open",bsiNum(q.o||0))+mkRow(iZhD?"最高":"High",bsiNum(q.h||0))+mkRow(iZhD?"最低":"Low",bsiNum(q.l||0))+mkRow(iZhD?"前收":"Prev Close",bsiNum(q.pc||0))+mkRow(iZhD?"成交量":"Volume",m["10DayAverageTradingVolume"]?bsiNum(m["10DayAverageTradingVolume"]/1e6)+"M":"-")}</div><div>${mkRow(iZhD?"市值":"Mkt Cap",p.marketCapitalization?bsiNum(p.marketCapitalization/1000)+"B":"-")+mkRow(iZhD?"市盈率":"P/E",m.peTTM?bsiNum(m.peTTM):"-")+mkRow(iZhD?"每股盈餘":"EPS",m.epsTTM?bsiNum(m.epsTTM):"-")+mkRow(iZhD?"股息率":"Div Yield",m.dividendYieldIndicatedAnnual?bsiNum(m.dividendYieldIndicatedAnnual)+"%":"-")+mkRow(iZhD?"52週範圍":"52W Range",`<span style="font-size:11px;">${bsiMoney(lo)} – ${bsiMoney(hi)}</span>`)}</div>`;
+    }
+    const tsi=qs("bsi-tradeSymbolInput");if(tsi)tsi.value=BSI.symbol;
+    bsiRenderOrderPosition();
+  }
+
+  function bsiRenderDiscover(){
+    const grid=document.getElementById("bsi-discoverGrid");if(!grid)return;
+    const stocks=BSI_TOP10.filter(s=>BSI.quotes[s]?.c);
+    if(!stocks.length){const iZh3=typeof curLang!=='undefined'&&curLang==='zh';grid.innerHTML='<div style="grid-column:span 5;padding:24px;text-align:center;color:var(--muted);">'+( iZh3?'載入市場數據中...':'Loading market data...')+'</div>';return;}
+    grid.innerHTML=stocks.map(sym=>{
+      const q=BSI.quotes[sym]||{},p=BSI.profiles[sym]||{};const up=(q.dp||0)>=0;
+      return `<div class="bsi-disc-card kpi-card" onclick="bsiOpenSymbol('${sym}')"><div class="kpi-lbl">${sym}</div><div style="font-size:11px;color:var(--muted);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(p.name||sym).substring(0,18)}</div><div style="font-size:20px;font-weight:700;letter-spacing:-.03em;">${bsiMoney(q.c||0)}</div><div style="font-size:12px;font-weight:600;margin-top:4px;color:${up?"var(--success)":"var(--error)"};">${bsiPct(q.dp||0)}</div></div>`;
+    }).join("");
+  }
+
+  function bsiRenderPortfolio(){
+    const pvt=bsiTotalValue();const entries=Object.entries(BSI.holdings);
+    // Pie chart
+    const ps=document.getElementById("bsi-pieChart"),le=document.getElementById("bsi-pieLegend");
+    if(ps&&le){
+      const segs=entries.map(([sym,h],i)=>({label:sym,value:bsiHoldingMV(sym),color:BSI_PIE_COLORS[i%BSI_PIE_COLORS.length]}));
+      segs.sort((a,b)=>b.value-a.value);
+      if((BSI.account.cash||0)>0)segs.push({label:"現金",value:BSI.account.cash,color:"var(--surfaceDyn)"});
+      if(!segs.length)segs.push({label:"Cash",value:100000,color:"var(--surfaceDyn)"});
+      bsiDrawPieChart(ps,segs);
+      le.innerHTML=segs.slice(0,6).map(s=>`<div class="bsi-legend-row"><div style="width:10px;height:10px;border-radius:50%;background:${s.color};flex-shrink:0;"></div><span style="flex:1;font-size:12px;font-weight:600;">${s.label}</span><span style="font-size:12px;color:var(--muted);">${pvt>0?((s.value/pvt)*100).toFixed(1):0}%</span></div>`).join("");
+    }
+    // Summary
+    const se=document.getElementById("bsi-portfolioSummary");
+    if(se){
+      const best=entries.reduce((b,[s,h])=>{const r=h.avgCost?((BSI.quotes[s]?.c||h.avgCost)-h.avgCost)/h.avgCost*100:-999;return r>b.r?{sym:s,r}:b;},{sym:"-",r:-999});
+      const worst=entries.reduce((w,[s,h])=>{const r=h.avgCost?((BSI.quotes[s]?.c||h.avgCost)-h.avgCost)/h.avgCost*100:999;return r<w.r?{sym:s,r}:w;},{sym:"-",r:999});
+      const iZhP=typeof curLang!=='undefined'&&curLang==='zh';
+      const mkRow=(l,v,c)=>`<div class="bsi-sum-row"><span style="color:var(--muted);font-size:12px;">${l}</span><span style="font-size:13px;font-weight:700;${c?"color:"+c:""}">${v}</span></div>`;
+      se.innerHTML=mkRow(iZhP?"總回報":"Total Return",bsiSignedMoney(bsiTotalRet())+" ("+bsiPct(bsiTotalRetPct())+")",bsiColorFor(bsiTotalRet()))+(entries.length?mkRow(iZhP?"最佳":"Best",best.r>-999?best.sym+" "+bsiPct(best.r):"-","var(--success)")+mkRow(iZhP?"最差":"Worst",worst.r<999?worst.sym+" "+bsiPct(worst.r):"-","var(--error)"):"");
+    }
+    // Holdings table
+    const pl=document.getElementById("bsi-holdingsList");if(!pl)return;pl.innerHTML="";
+    if(!entries.length){const iZh2=typeof curLang!=='undefined'&&curLang==='zh';pl.innerHTML='<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">'+(iZh2?'還沒有持股，前往市場頁下單。':'No holdings yet. Go to Market tab to trade.')+'</td></tr>';return;}
+    [...entries].reverse().forEach(([sym,h])=>{
+      const q=BSI.quotes[sym]||{},p=BSI.profiles[sym]||{};
+      const cp=q.c||h.avgCost||0,vl=(h.shares||0)*cp,rp=h.avgCost?((cp-h.avgCost)/h.avgCost)*100:0;
+      const tr=document.createElement("tr");tr.className="bsi-holding-tr";tr.onclick=()=>bsiOpenSymbol(sym);
+      tr.innerHTML=`<td><div style="font-weight:700;">${sym}</div><div style="font-size:11px;color:var(--muted);">${(p.name||sym).substring(0,20)}</div></td><td style="text-align:right;">${bsiNum(h.shares||0,0)}</td><td style="text-align:right;">${bsiMoney(vl)}</td><td style="text-align:right;">${bsiMoney(h.avgCost||0)}</td><td style="text-align:right;font-weight:700;color:${bsiColorFor(rp)};">${bsiPct(rp)}</td>`;
+      pl.appendChild(tr);
+    });
+  }
+
+  function bsiRenderOrderPosition(){
+    const q=BSI.quotes[BSI.symbol]||{},h=BSI.holdings[BSI.symbol]||{shares:0,avgCost:0};
+    const price=q.c||0,val=(h.shares||0)*price,tRet=val-(h.shares||0)*(h.avgCost||0),tRetPct=h.avgCost?((price-h.avgCost)/h.avgCost)*100:0;
+    const qs=s=>document.getElementById(s);
+    if(qs("bsi-ordersPosSymbol"))qs("bsi-ordersPosSymbol").textContent=BSI.symbol;
+    const hp=(h.shares||0)>0;
+    if(qs("bsi-posTotalRet")){qs("bsi-posTotalRet").textContent=hp?bsiSignedMoney(tRet)+" ("+bsiPct(tRetPct)+")":"—";qs("bsi-posTotalRet").style.color=hp?bsiColorFor(tRetPct):"var(--muted)";}
+    if(qs("bsi-posBuyingPower"))qs("bsi-posBuyingPower").textContent=bsiMoney(BSI.account.cash||0);
+    bsiCalcEst();
+  }
+
+  function bsiRenderPendingOrders(){
+    const le=document.getElementById("bsi-pendingOrdersList");if(!le)return;le.innerHTML="";
+    if(!BSI.pendingOrders.length){const iZh4=typeof curLang!=='undefined'&&curLang==='zh';le.innerHTML='<div style="font-size:13px;color:var(--muted);padding:8px 0;">'+(iZh4?'沒有待處理訂單。':'No pending orders.')+'</div>';return;}
+    BSI.pendingOrders.forEach(po=>{
+      const mp=BSI.quotes[po.symbol]?.c||0;const isBuy=po.side==="buy";
+      const row=document.createElement("div");row.className="bsi-order-row";
+      row.innerHTML=`<div style="width:28px;height:28px;border-radius:8px;background:${isBuy?"var(--primaryHL)":"rgba(255,59,48,.1)"};display:flex;align-items:center;justify-content:center;font-size:13px;color:${isBuy?"var(--primary)":"var(--error)"};">${isBuy?"↑":"↓"}</div><div><div style="font-size:13px;font-weight:700;">${po.side==="buy"?"買":"賣"} ${po.symbol} · 限價 ${bsiMoney(po.price)}</div><div style="font-size:11px;color:var(--muted);">${po.shares}股 · 現價 ${bsiMoney(mp)} · ${bsiFormatDate(po.createdAt)}</div></div><button onclick="bsiCancelPendingOrder('${po.id}')" style="padding:4px 10px;border:1px solid var(--divider);border-radius:var(--rFull);font-size:11px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--error);font-family:inherit;">取消</button>`;
+      le.appendChild(row);
+    });
+  }
+
+  function bsiRenderOrders(){
+    const le=document.getElementById("bsi-ordersList");if(!le)return;le.innerHTML="";
+    let f=BSI.orders;
+    if(BSI.orderFilter==="buy"||BSI.orderFilter==="sell")f=f.filter(o=>o.side===BSI.orderFilter);
+    else if(BSI.orderFilter==="this-month"){const now=new Date();f=f.filter(o=>{const d=o.createdAt?.toDate?o.createdAt.toDate():new Date(o.createdAt);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});}
+    if(!f.length){const iZh5=typeof curLang!=='undefined'&&curLang==='zh';le.innerHTML='<div style="font-size:13px;color:var(--muted);padding:16px 0;text-align:center;">'+(iZh5?'沒有訂單記錄。':'No order history.')+'</div>';return;}
+    f.slice(0,30).forEach(o=>{
+      const isBuy=o.side==="buy";
+      const row=document.createElement("div");row.className="bsi-order-row";
+      row.innerHTML=`<div style="width:28px;height:28px;border-radius:8px;background:${isBuy?"var(--primaryHL)":"rgba(255,59,48,.1)"};display:flex;align-items:center;justify-content:center;font-size:13px;color:${isBuy?"var(--primary)":"var(--error)"};">${isBuy?"↑":"↓"}</div><div><div style="font-size:13px;font-weight:700;">${isBuy?"買入":"賣出"} ${o.symbol}</div><div style="font-size:11px;color:var(--muted);">@${bsiNum(o.shares||0,0)} · ${bsiFormatDate(o.createdAt)}</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:700;color:${isBuy?"var(--text)":"var(--error)"};">${isBuy?bsiMoney(o.total||0):"-"+bsiMoney(o.total||0)}</div><div style="font-size:11px;color:var(--muted);">@ ${bsiMoney(o.price||0)}</div></div>`;
+      le.appendChild(row);
+    });
+  }
+
+  // Events
+  function bsiBindUI(){
+    document.querySelectorAll(".bsi-subnav-btn").forEach(b=>{
+      if(b.dataset.bsiBound)return;b.dataset.bsiBound="1";
+      b.addEventListener("click",function(){bsiNavigate(this.dataset.bsi);});
+    });
+    const timeTabs=document.getElementById("bsi-homeTimeTabs");
+    if(timeTabs)timeTabs.querySelectorAll(".bsi-tab").forEach(b=>{if(b.dataset.bsiBound)return;b.dataset.bsiBound="1";b.addEventListener("click",function(){timeTabs.querySelectorAll(".bsi-tab").forEach(x=>x.classList.remove("active"));this.classList.add("active");BSI.homeRange=this.dataset.range;bsiRenderHome();});});
+    document.querySelectorAll(".bsi-filter-btn").forEach(b=>{if(b.dataset.bsiBound)return;b.dataset.bsiBound="1";b.addEventListener("click",function(){document.querySelectorAll(".bsi-filter-btn").forEach(x=>x.classList.remove("active"));this.classList.add("active");BSI.orderFilter=this.dataset.filter||"all";bsiRenderOrders();});});
+    const sr=document.getElementById("bsi-searchInput");
+    if(sr&&!sr.dataset.bsiBound){sr.dataset.bsiBound="1";sr.addEventListener("keydown",async e=>{if(e.key!=="Enter")return;const sym=sr.value.trim().toUpperCase();if(!sym)return;bsiShowLoading();try{if(!BSI.quotes[sym]){const[q,p,m]=await Promise.all([fetch(BSI_API+"/quote?symbol="+encodeURIComponent(sym)).then(r=>r.json()),fetch(BSI_API+"/profile2?symbol="+encodeURIComponent(sym)).then(r=>r.json()),fetch(BSI_API+"/metric?symbol="+encodeURIComponent(sym)).then(r=>r.json())]);BSI.quotes[sym]=q||{};BSI.profiles[sym]=p||{};BSI.metrics[sym]=m?.metric||m||{};}sr.value="";bsiOpenSymbol(sym);}catch(e){bsiToast("找不到股票："+sym,"error");}finally{bsiHideLoading();}});}
+  }
+
+  // Bootstrap
+  window.bsiSetCapital = function(){
+    const cur = BSI.account.startingBalance || 100000;
+    const isChinese = typeof curLang !== 'undefined' && curLang === 'zh';
+    const detailHTML = `
+      <div style="margin-bottom:12px;">
+        <div class="kpi-lbl" style="margin-bottom:6px;">${isChinese?'初始資金金額 (USD)':'Starting Capital (USD)'}</div>
+        <input id="bsi-capitalInput" type="number" min="1000" step="1000"
+          value="${cur}"
+          style="width:100%;padding:10px 14px;border:1px solid var(--divider);border-radius:var(--r);font-size:16px;font-weight:700;font-family:inherit;color:var(--text);background:var(--surfaceOff);outline:none;box-sizing:border-box;"/>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted);">${isChinese?'購買力將同步更新為新設定的金額（現有持倉及交易記錄不受影響）。':'Buying power will be updated to match. Existing holdings and orders are not affected.'}</div>
+      </div>
+    `;
+    bsiOpenModal(
+      isChinese?"設定初始資金":"Set Starting Capital",
+      isChinese?"修改模擬帳戶的起始資金及購買力":"Update your simulated account capital and buying power",
+      detailHTML,
+      isChinese?"確認設定":"Confirm",
+      "var(--primary)",
+      bsiConfirmSetCapital
+    );
+    setTimeout(()=>{ const inp=document.getElementById("bsi-capitalInput"); if(inp){inp.focus();inp.select();} },100);
+  };
+
+  async function bsiConfirmSetCapital(){
+    const inp = document.getElementById("bsi-capitalInput");
+    const val = parseFloat(inp?.value);
+    const isChinese = typeof curLang !== 'undefined' && curLang === 'zh';
+    if(!val || val < 1000){ bsiToast(isChinese?"請輸入最少 $1,000 的金額":"Minimum $1,000 required","error"); return; }
+    window.bsiCloseModal();
+    bsiShowLoading();
+    try{
+      const newCapital = Math.round(val);
+      // 同時更新 startingBalance 和 cash（購買力）
+      await updateDoc(bsiAccountRef(), { startingBalance: newCapital, cash: newCapital });
+      BSI.account.startingBalance = newCapital;
+      BSI.account.cash = newCapital;
+      bsiRenderHome();bsiRenderOrderPosition();
+      bsiToast((isChinese?"初始資金及購買力已設為 ":"Capital set to ") + bsiMoney(newCapital), "success");
+    }catch(e){
+      bsiToast((isChinese?"設定失敗：":"Failed: ") + e.message, "error");
+    }finally{
+      bsiHideLoading();
+    }
+  }
+
+  window.bsiResetAccount = function(){
+    bsiOpenModal(
+      "重設模擬帳戶",
+      "此操作將清除所有持股、訂單記錄，並把資金重設為 $100,000。",
+      `<div style="padding:14px;background:rgba(255,59,48,.08);border-radius:var(--rLg);font-size:13px;color:var(--error);font-weight:600;">⚠️ 此操作不可撤銷</div>`,
+      "確認重設",
+      "var(--error)",
+      bsiDoReset
+    );
+  };
+
+  async function bsiDoReset(){
+    window.bsiCloseModal();
+    bsiShowLoading();
+    try{
+      // 刪除所有持股
+      const hSnap = await getDocs(bsiHoldingsCol());
+      await Promise.all(hSnap.docs.map(d=>deleteDoc(d.ref)));
+      // 刪除所有訂單
+      const oSnap = await getDocs(bsiOrdersCol());
+      await Promise.all(oSnap.docs.map(d=>deleteDoc(d.ref)));
+      // 刪除所有限價單
+      const pSnap = await getDocs(bsiPendingCol());
+      await Promise.all(pSnap.docs.map(d=>deleteDoc(d.ref)));
+      // 重設帳戶
+      await setDoc(bsiAccountRef(),{startingBalance:100000,cash:100000,displayName:"Trader",createdAt:serverTimestamp()});
+      // 清空本地狀態
+      BSI.holdings={};BSI.orders=[];BSI.pendingOrders=[];
+      BSI.account={startingBalance:100000,cash:100000};
+      // 重新渲染
+      bsiRenderHome();bsiRenderDetail();bsiRenderDiscover();
+      bsiRenderPendingOrders();bsiRenderOrders();bsiRenderOrderPosition();
+      bsiToast("模擬帳戶已重設，資金 $100,000","success");
+    }catch(e){
+      bsiToast("重設失敗："+e.message,"error");
+    }finally{
+      bsiHideLoading();
+    }
+  }
+
+  function bsiApplyLang(){
+    const zh = typeof curLang !== 'undefined' && curLang === 'zh';
+
+    // 每次都做完整替換：先還原成中文，再按需換成英文
+    // zh_map: 英文 → 中文（還原用）
+    // en_map: 中文 → 英文（英文模式用）
+    const pairs = [
+      ['⌂ 組合',         '⌂ Portfolio'],
+      ['⌕ 市場',         '⌕ Market'],
+      ['⇄ 交易',         '⇄ Orders'],
+      ['總資產',          'Total Assets'],
+      ['購買力',          'Buying Power'],
+      ['持股市值',        'Portfolio Value'],
+      ['現金餘額',        'Cash Balance'],
+      ['資產走勢',        'Asset Trend'],
+      ['觀察名單',        'Watchlist'],
+      ['持股明細',        'Holdings'],
+      ['資產配置',        'Allocation'],
+      ['績效摘要',        'Performance'],
+      ['主要統計',        'Key Stats'],
+      ['下單',            'Place Order'],
+      ['待處理限價單',    'Pending Limit Orders'],
+      ['交易記錄',        'Trade History'],
+      ['訂單記錄',        'Order History'],
+      ['股票代號',        'Symbol'],
+      ['訂單類型',        'Order Type'],
+      ['平均成本',        'Avg Cost'],
+      ['回報率',          'Return'],
+      ['市價',            'Market Price'],
+      ['手續費',          'Commission'],
+      ['預計總計',        'Est. Total'],
+      ['確認買入',        'Confirm Buy'],
+      ['確認賣出',        'Confirm Sell'],
+      ['最大',            'Max'],
+      ['掛單',            'Place Order'],
+      ['$ 設定初始資金', '$ Set Capital'],
+      ['↺ 重設模擬帳戶', '↺ Reset Account'],
+      ['市價單',          'Market'],
+      ['限價單',          'Limit'],
+      [' 股票',           ' stocks'],
+      ['現金',            'Cash'],
+      ['今日',            'Today'],
+      ['總回報',          'Total Return'],
+      ['你的持倉 — ',    'Your Position — '],
+      ['全部',            'All'],
+      ['本月',            'This Month'],
+      ['最佳',            'Best'],
+      ['最差',            'Worst'],
+      ['起始資金',        'Starting Capital'],
+      ['沒有待處理訂單。','No pending orders.'],
+      ['沒有訂單記錄。',  'No order history.'],
+      ['買入',            'Buy'],
+      ['賣出',            'Sell'],
+      ['股數',            'Qty'],
+      ['市值',            'Value'],
+      ['股票',            'Stock'],
+      ['取消',            'Cancel'],
+    ];
+
+    const bsiView = document.getElementById('view-blackinvest');
+    if(!bsiView) return;
+
+    function walkText(node, fromArr, toArr){
+      if(node.nodeType===3){
+        let t = node.textContent;
+        let changed = false;
+        for(let i=0; i<fromArr.length; i++){
+          if(t.includes(fromArr[i])){
+            t = t.split(fromArr[i]).join(toArr[i]);
+            changed = true;
+          }
+        }
+        if(changed) node.textContent = t;
+      } else if(node.nodeType===1){
+        const tag = node.tagName;
+        if(tag==='SCRIPT'||tag==='STYLE'||tag==='INPUT'||tag==='SVG') return;
+        node.childNodes.forEach(n=>walkText(n, fromArr, toArr));
+      }
+    }
+
+    const zhArr = pairs.map(p=>p[0]);
+    const enArr = pairs.map(p=>p[1]);
+
+    // 步驟1：先把英文還原成中文（不論當前語言）
+    walkText(bsiView, enArr, zhArr);
+
+    // 步驟2：如果是英文模式，再把中文換成英文
+    if(!zh){
+      walkText(bsiView, zhArr, enArr);
+    }
+
+    // select options 單獨處理（不在text node裡）
+    const otSel = document.getElementById('bsi-orderTypeSelect');
+    if(otSel){
+      otSel.options[0].textContent = zh ? '市價單' : 'Market';
+      otSel.options[1].textContent = zh ? '限價單' : 'Limit';
+    }
+
+    // placeholder 單獨處理
+    const srch = document.getElementById('bsi-searchInput');
+    if(srch) srch.placeholder = zh ? '搜尋股票…' : 'Search symbol…';
+  }
+  window.bsiApplyLang = bsiApplyLang;
+
+  async function bsiBootstrap(){
+    if(BSI.initialised)return;BSI.initialised=true;
+    window._bsiPendingBoot = false;
+    await bsiEnsureAccount();await bsiLoadAccount();await bsiLoadHoldings();await bsiLoadOrders();await bsiLoadPendingOrders();
+    // 先載入持倉和當前symbol（快），再背景載入TOP10（慢）
+    bsiShowLoading();
+    try{await bsiLoadMarketData({skipTop10:true});}catch(e){}
+    bsiHideLoading();
+    // 背景載入TOP10，不阻塞
+    bsiLoadMarketData({}).then(()=>bsiRenderDiscover()).catch(()=>{});
+    try{await bsiCheckPendingOrders();}catch(e){}
+    bsiRenderHome();bsiRenderDetail();bsiRenderDiscover();bsiRenderPendingOrders();bsiRenderOrders();bsiRenderOrderPosition();
+    setTimeout(()=>bsiApplyLang(), 100);
+    bsiBindUI();
+    if(!window._bsiRefreshTimer){window._bsiRefreshTimer=setInterval(async()=>{try{await bsiLoadMarketData();await bsiCheckPendingOrders();bsiRenderHome();bsiRenderDetail();bsiRenderDiscover();bsiRenderPortfolio();bsiRenderOrderPosition();bsiRenderPendingOrders();}catch(e){}},30000);}
+  }
+  window.bsiBootstrap=bsiBootstrap;
+
+  function hookSetView(){
+    const orig=window.setView;if(!orig){setTimeout(hookSetView,100);return;}
+    window.setView=function(v){
+      orig(v);
+      if(v==="blackinvest"){
+        const vt=document.getElementById("view-title");
+        if(vt)vt.textContent=curLang==="zh"?"模擬交易":"Sim Trading";
+        const vs=document.getElementById("view-sub");
+        if(vs)vs.textContent=curLang==="zh"?"模擬股票買賣":"Simulated stock trading";
+        bsiApplyLang();
+        if(window._bsiAuthReady && window._bsDb){
+          bsiBootstrap();
+        } else {
+          // Auth not ready yet — set flag so onAuthStateChanged triggers bootstrap
+          window._bsiPendingBoot = true;
+          // Also try polling as fallback
+          let tries = 0;
+          const poll = setInterval(()=>{
+            tries++;
+            if(window._bsiAuthReady && window._bsDb){
+              clearInterval(poll);
+              window._bsiPendingBoot = false;
+              bsiBootstrap();
+            } else if(tries > 20){ clearInterval(poll); }
+          }, 300);
+        }
+      }
+    };
+    document.querySelectorAll('.bottom-nav-btn[data-view="blackinvest"]').forEach(btn=>{
+      if(!btn.dataset.bsiBound){btn.dataset.bsiBound="1";btn.addEventListener("click",()=>window.setView("blackinvest"));}
+    });
+  }
+  if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",()=>{hookSetView();if(window.VIEW_KEYS)window.VIEW_KEYS.blackinvest={title:"模擬交易",sub:"模擬股票買賣"};});}
+  else{hookSetView();if(window.VIEW_KEYS)window.VIEW_KEYS.blackinvest={title:"模擬交易",sub:"模擬股票買賣"};}
+})();
+</script>
 </body></html>
