@@ -3445,7 +3445,7 @@ function calPassesDateFilter(ev){
 }
 function calPassesImportanceFilter(ev){
   if(calActiveImportance === 'all') return true;
-  if(ev.type === 'earnings') return true;
+  if(ev.type === 'earnings') return false;
   return ev.importance === calActiveImportance;
 }
 function calEarningsHasData(d){
@@ -3744,6 +3744,10 @@ function initCalendarBindings(){
     const chip = e.target.closest('[data-imp]');
     if(!chip) return;
     calActiveImportance = chip.dataset.imp;
+    if(calActiveImportance !== 'all' && calActiveFilter === 'earnings'){
+      calActiveFilter = 'all';
+      document.querySelectorAll('.cal-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === 'all'));
+    }
     document.querySelectorAll('.cal-imp-chip').forEach(c => c.classList.toggle('active', c === chip));
     calRender();
   });
